@@ -1,6 +1,6 @@
 # Capsolver API SDK (Rust)
 
-![Capsolver](https://capsolver.com/assets/images/logo.png)
+![Capsolver](https://www.capsolver.com/_nuxt/logo.eb4b912e.png)
 
 The Capsolver API SDK in Rust is a library that allows developers to easily integrate the Capsolver captcha solving service into their Rust applications. Capsolver is a powerful captcha solving service designed to handle a wide range of captchas with high accuracy.
 
@@ -10,22 +10,39 @@ To get started with the Capsolver API SDK, follow the steps below:
 
 ### Prerequisites
 
-- Rust programming language (version 1.55.0 or later)
+- Rust programming language
 - Cargo package manager
-
-### Installation
-
-Add the Capsolver API SDK as a dependency in your `Cargo.toml` file:
-
-```toml
-[dependencies]
-capsolver = "0.1.0"
-```
 
 ## Usage
 
 ```rust
-use capsolver::Capsolver;
+use capsolver::{CapSolver, Config};
+
+#[tokio::main]
+fn main() {
+    let config = Config::new("", None);
+    let capsolver = CapSolver::new(config);
+
+    let balance = capsolver.get_balance().await.unwrap().balance.unwrap();
+
+    println!("Balance: {}", balance);
+
+    let task_id = capsolver
+        .token()
+        .aws_waf("<Type>", "<Website URL>", None)
+        .await
+        .unwrap()["taskId"]
+        .as_str();
+
+    match capsolver.get_task_result(task_id).await {
+        Ok(res) => {
+            //Your logic
+        }
+        Err(err) => {
+            println!(err);
+        }
+    }
+}
 ```
 
  ## API Documentation
