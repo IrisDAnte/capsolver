@@ -39,7 +39,7 @@ impl Config {
         })
     }
 
-    pub async fn create_task(&self, body: Value) -> Result<Value, String> {
+    async fn create_task(&self, body: Value) -> Result<Value, String> {
         let res = self
             .client
             .post(self.api_url.join("createTask").unwrap())
@@ -112,6 +112,13 @@ impl CapSolver {
         }
     }
 
+    pub async fn create_task(&self, body: &str) -> Result<Value, String> {
+        match serde_json::from_str(body) {
+            Ok(o) => self.config.create_task(o).await,
+            _ => Err("Inavlid JSON".to_string()),
+        }
+    }
+
     pub fn recognition(&self) -> &Recognition {
         &self.recognition
     }
@@ -180,7 +187,6 @@ impl CapSolver {
             Err(e) => Err(e.to_string()),
         }
     }
-
 }
 
 pub struct Recognition {
