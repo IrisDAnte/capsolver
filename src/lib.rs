@@ -1,5 +1,5 @@
 use reqwest::{Client, Url};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -74,33 +74,16 @@ impl Config {
     }
 }
 
+#[derive(Deserialize)]
 pub struct GetBalance {
     pub balance: f64,
     pub packages: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskResponse {
-    error_id: Option<usize>,
-    error_code: Option<String>,
-    error_description: Option<String>,
-    pub status: Option<String>,
-    pub task_id: Option<String>,
 }
 
 pub struct CapSolver {
     config: Config,
     recognition: Recognition,
     token: Token,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct SolveOptions<'a> {
-    #[serde(rename = "type")]
-    task_type: &'a str,
-    body: &'a str,
-    module: &'a str,
 }
 
 impl CapSolver {
@@ -145,13 +128,7 @@ impl CapSolver {
                     ));
                 }
 
-                let packages: Vec<String> =
-                    serde_json::from_value(data["packages"].clone()).unwrap();
-
-                Ok(GetBalance {
-                    balance: data["balance"].as_f64().unwrap(),
-                    packages,
-                })
+                Ok(serde_json::from_value::<GetBalance>(data).unwrap())
             }
             Err(e) => Err(e.to_string()),
         }
@@ -164,7 +141,7 @@ impl CapSolver {
         }
     }
 
-    pub async fn get_task_result(&self, task_id: &str) -> Result<Value, String> {
+    pub async fn get_task_result<T: DeserializeOwned>(&self, task_id: &str) -> Result<T, String> {
         let config = &self.config;
         let mut body = config.make_body();
 
@@ -190,7 +167,7 @@ impl CapSolver {
                     ));
                 }
 
-                Ok(data)
+                Ok(serde_json::from_value::<T>(data["solution"].clone()).unwrap())
             }
             Err(e) => Err(e.to_string()),
         }
@@ -246,11 +223,12 @@ impl Recognition {
     pub async fn h_captcha(&self, queries: Vec<String>, question: &str) -> Result<Value, String> {
         let config = &self.config;
         let mut body = config.make_body();
-        let task = &mut body["task"];
 
-        task["type"] = json!("HCaptchaClassification");
-        task["queries"] = json!(queries);
-        task["question"] = json!(question);
+        body["task"] = json!({
+            "type": "HCaptchaClassification",
+            "queries": queries,
+            "question": question
+        });
 
         config.create_task(body).await
     }
@@ -258,11 +236,12 @@ impl Recognition {
     pub async fn fun_captcha(&self, imgs: Vec<String>, question: &str) -> Result<Value, String> {
         let config = &self.config;
         let mut body = config.make_body();
-        let task = &mut body["task"];
 
-        task["type"] = json!("FunCaptchaClassification");
-        task["images"] = json!(imgs);
-        task["question"] = json!(question);
+        body["task"] = json!({
+            "type": "FunCaptchaClassification",
+            "images": imgs,
+            "question": question
+        });
 
         config.create_task(body).await
     }
@@ -294,6 +273,66 @@ impl Recognition {
 
 pub struct Token {
     config: Config,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HCaptchaToken {
+    pub user_agent: String,
+    pub expire_time: isize,
+    pub timestamp: isize,
+    pub captcha_key: String,
+    pub g_recaptcha_response: String,
+}
+
+#[derive(Deserialize)]
+pub struct OnlyToken {
+    pub token: String,
+}
+
+#[derive(Deserialize)]
+pub struct GeeTestV3Token {
+    pub challenge: String,
+    pub validate: String
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeeTestV4Token {
+    pub captcha_id: String,
+    pub captcha_output: String,
+    pub gen_time: String,
+    pub lot_number: String,
+    pub pass_token: String,
+    pub risk_type: String
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReCaptchaToken {
+    pub user_agent: String,
+    pub expire_time: isize,
+    pub g_recaptcha_response: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataDomeToken {
+    pub user_agent: String,
+    pub cookie: isize
+}
+
+#[derive(Deserialize)]
+pub struct AwsWafToken {
+    pub cookie: String
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudfareToken {
+    pub token: String,
+    pub r#type: String,
+    pub user_agent: String,
 }
 
 impl Token {

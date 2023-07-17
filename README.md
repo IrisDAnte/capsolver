@@ -16,30 +16,27 @@ To get started with the Capsolver API SDK, follow the steps below:
 ## Usage
 
 ```rust
-use capsolver::{CapSolver, Config};
+use capsolver::{CapSolver, Config, OnlyToken};
 
 #[tokio::main]
-async fn main() { 
-    let config = Config::new("<YOUR CLIENT KEY>", None);
-    //Or load it from the environment
+async fn main() {
     let config = Config::from_env().unwrap();
-
     let capsolver = CapSolver::new(config);
 
     //Check balance
     match capsolver.get_balance().await {
         Ok(o) => {
             println!("Balance: {}\nPackages: {:?}", o.balance, o.packages);
-        },
+        }
         Err(e) => {
             println!("Error checking balance\n{}", e);
-        },
+        }
     }
 
     //Create task
     match capsolver
-        .recognition()
-        .image_to_text("l".to_string(), None, None, None)
+        .token()
+        .fun_captcha("<WebsiteUrl>", "WebsitePublicKey", None, None, None)
         .await
     {
         Ok(o) => {
@@ -49,15 +46,15 @@ async fn main() {
             println!("{}", e);
         }
     };
-  
+
     //Get task result
-    match capsolver.get_task_result("h").await {
+    match capsolver.get_task_result::<OnlyToken>("h").await {
         Ok(o) => {
-            println!("{}", o.to_string());
-        },
+            println!("{}", o.token);
+        }
         Err(e) => {
             println!("{}", e);
-        },
+        }
     };
 }
 ```
