@@ -33,6 +33,13 @@ impl Config {
         }
     }
 
+    pub fn from_env() -> Result<Config, String> {
+        match option_env!("CAPSOLVER_CLIENT_KEY") {
+            Some(s) => Ok(Config::new(s, None)),
+            _ => Err("CAPSOLVER_CLIENT_KEY environment variable not found".to_string()),
+        }
+    }
+
     fn make_body(&self) -> Value {
         json!({
             "clientKey": self.api_key
@@ -67,14 +74,9 @@ impl Config {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GetBalance {
-    error_id: Option<usize>,
-    error_code: Option<String>,
-    error_description: Option<String>,
-    pub balance: Option<f64>,
-    pub packages: Option<Vec<String>>,
+    pub balance: f64,
+    pub packages: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -112,13 +114,6 @@ impl CapSolver {
         }
     }
 
-    pub async fn create_task(&self, body: &str) -> Result<Value, String> {
-        match serde_json::from_str(body) {
-            Ok(o) => self.config.create_task(o).await,
-            _ => Err("Inavlid JSON".to_string()),
-        }
-    }
-
     pub fn recognition(&self) -> &Recognition {
         &self.recognition
     }
@@ -140,19 +135,32 @@ impl CapSolver {
 
         match res {
             Ok(o) => {
-                let data = o.json::<GetBalance>().await.unwrap();
+                let data: Value = serde_json::from_str(o.text().await.unwrap().as_str()).unwrap();
 
-                if data.error_id.unwrap() != 0 {
+                if data["errorId"].as_i64().unwrap() != 0 {
                     return Err(format!(
-                        "{} {}",
-                        data.error_code.unwrap(),
-                        data.error_description.unwrap()
+                        "{}: {}",
+                        data["errorCode"].as_str().unwrap(),
+                        data["errorDescription"].as_str().unwrap()
                     ));
                 }
 
-                Ok(data)
+                let packages: Vec<String> =
+                    serde_json::from_value(data["packages"].clone()).unwrap();
+
+                Ok(GetBalance {
+                    balance: data["balance"].as_f64().unwrap(),
+                    packages,
+                })
             }
             Err(e) => Err(e.to_string()),
+        }
+    }
+
+    pub async fn create_task(&self, body: &str) -> Result<Value, String> {
+        match serde_json::from_str(body) {
+            Ok(o) => self.config.create_task(o).await,
+            _ => Err("Inavlid JSON".to_string()),
         }
     }
 
