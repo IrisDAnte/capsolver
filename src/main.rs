@@ -2,8 +2,6 @@ use capsolver::{CapSolver, Config};
 
 #[tokio::main]
 async fn main() { 
-    let config = Config::new("CAI-7AFF7887960A71E568F95C364986E539", None);
-    //Or load it from the environment
     let config = Config::from_env().unwrap();
 
     let capsolver = CapSolver::new(config);

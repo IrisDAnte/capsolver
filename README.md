@@ -19,29 +19,46 @@ To get started with the Capsolver API SDK, follow the steps below:
 use capsolver::{CapSolver, Config};
 
 #[tokio::main]
-fn main() {
-    let config = Config::new("", None);
+async fn main() { 
+    let config = Config::new("<YOUR CLIENT KEY>", None);
+    //Or load it from the environment
+    let config = Config::from_env().unwrap();
+
     let capsolver = CapSolver::new(config);
 
-    let balance = capsolver.get_balance().await.unwrap().balance.unwrap();
-
-    println!("Balance: {}", balance);
-
-    let task_id = capsolver
-        .token()
-        .aws_waf("<Type>", "<Website URL>", None)
-        .await
-        .unwrap()["taskId"]
-        .as_str();
-
-    match capsolver.get_task_result(task_id).await {
-        Ok(res) => {
-            //Your logic
-        }
-        Err(err) => {
-            println!(err);
-        }
+    //Check balance
+    match capsolver.get_balance().await {
+        Ok(o) => {
+            println!("Balance: {}\nPackages: {:?}", o.balance, o.packages);
+        },
+        Err(e) => {
+            println!("Error checking balance\n{}", e);
+        },
     }
+
+    //Create task
+    match capsolver
+        .recognition()
+        .image_to_text("l".to_string(), None, None, None)
+        .await
+    {
+        Ok(o) => {
+            println!("{}", o.to_string());
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
+    };
+  
+    //Get task result
+    match capsolver.get_task_result("h").await {
+        Ok(o) => {
+            println!("{}", o.to_string());
+        },
+        Err(e) => {
+            println!("{}", e);
+        },
+    };
 }
 ```
 
