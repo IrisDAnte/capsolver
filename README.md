@@ -96,6 +96,16 @@ let res = capsolver.get_balance().await?;
 
 println!("Balance: {},\nPackages: {:?}", res.balance, res.packages);
 ```
+Using `ImageToText` recognition:
+```rust
+let task = capsolver
+  .recognition()
+  .image_to_text("<Image in base64 string>", None, None, None)
+  .await?;
+let solution = task["solution"]["text"].as_str()?;
+
+println!("Solution: {}", solution);
+```
 
 ## Solve captcha
 When you submit any image-based captcha use can provide additional options to help 2captcha workers to solve it properly.
