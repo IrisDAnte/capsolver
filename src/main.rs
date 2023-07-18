@@ -16,21 +16,15 @@ async fn main() {
     }
 
     //Create task
-    match capsolver
+    let task = capsolver
         .token()
-        .fun_captcha("<WebsiteUrl>", "WebsitePublicKey", None, None, None)
+        .fun_captcha("<WebsiteUrl>", "<WebsitePublicKey>", None, None, None)
         .await
-    {
-        Ok(o) => {
-            println!("{}", o.to_string());
-        }
-        Err(e) => {
-            println!("{}", e);
-        }
-    };
+        .unwrap();
+    let task_id = task["taskId"].as_str().unwrap();
 
     //Get task result
-    match capsolver.get_task_result::<OnlyToken>("h").await {
+    match capsolver.get_task_result::<OnlyToken>(task_id).await {
         Ok(o) => {
             println!("{}", o.token);
         }

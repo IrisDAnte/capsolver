@@ -1,7 +1,8 @@
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
+use tokio::time::interval;
 
 const SUPPORTED_MODULES: [&'static str; 2] = ["common", "queueit"];
 const H_CAPTCHA_TYPES: [&'static str; 3] =
@@ -18,24 +19,27 @@ pub struct Config {
     api_key: String,
     api_url: Url,
     client: Client,
+    interval: u64,
 }
 
 impl Config {
-    pub fn new(api_key: &str, api_url: Option<&str>) -> Self {
+    pub fn new(api_key: &str, api_url: Option<&str>, interval: Option<u64>) -> Self {
         let client = Client::new();
         let api_key = api_key.to_string();
         let api_url = Url::parse(api_url.unwrap_or("https://api.capsolver.com")).unwrap();
+        let interval = interval.unwrap_or(3000);
 
         Self {
             api_url,
             api_key,
             client,
+            interval,
         }
     }
 
     pub fn from_env() -> Result<Config, String> {
         match option_env!("CAPSOLVER_CLIENT_KEY") {
-            Some(s) => Ok(Config::new(s, None)),
+            Some(s) => Ok(Config::new(s, None, None)),
             _ => Err("CAPSOLVER_CLIENT_KEY environment variable not found".to_string()),
         }
     }
@@ -53,13 +57,12 @@ impl Config {
             .json(&body)
             .send()
             .await;
-        println!("{}", body.to_string());
 
         match res {
             Ok(o) => {
-                let data = json!(o.text().await.unwrap());
+                let data: Value = serde_json::from_str(o.text().await.unwrap().as_str()).unwrap();
 
-                if data["errorId"].as_i64().unwrap_or(0) != 0 {
+                if data["errorId"].as_i64().unwrap() != 0 {
                     return Err(format!(
                         "{}: {}",
                         data["errorCode"].as_str().unwrap(),
@@ -143,33 +146,40 @@ impl CapSolver {
 
     pub async fn get_task_result<T: DeserializeOwned>(&self, task_id: &str) -> Result<T, String> {
         let config = &self.config;
+        let mut interval = interval(Duration::from_millis(config.interval));
         let mut body = config.make_body();
 
         body["taskId"] = json!(task_id);
 
-        let res = config
-            .client
-            .post(config.api_url.join("getTaskResult").unwrap())
-            .json(&body)
-            .send()
-            .await;
-        println!("{}", body.to_string());
+        loop {
+            let res = config
+                .client
+                .post(config.api_url.join("getTaskResult").unwrap())
+                .json(&body)
+                .send()
+                .await;
 
-        match res {
-            Ok(o) => {
-                let data = json!(o.text().await.unwrap());
+            match res {
+                Ok(o) => {
+                    let data: Value =
+                        serde_json::from_str(o.text().await.unwrap().as_str()).unwrap();
 
-                if data["errorId"].as_i64().unwrap_or(0) != 0 {
-                    return Err(format!(
-                        "{}: {}",
-                        data["errorCode"].as_str().unwrap(),
-                        data["errorDescription"].as_str().unwrap()
-                    ));
+                    if data["errorId"].as_i64().unwrap() != 0 {
+                        return Err(format!(
+                            "{}: {}",
+                            data["errorCode"].as_str().unwrap(),
+                            data["errorDescription"].as_str().unwrap()
+                        ));
+                    }
+
+                    if data["status"].as_str().unwrap() == "ready" {
+                        return Ok(serde_json::from_value::<T>(data["solution"].clone()).unwrap());
+                    }
                 }
-
-                Ok(serde_json::from_value::<T>(data["solution"].clone()).unwrap())
+                Err(e) => return Err(e.to_string()),
             }
-            Err(e) => Err(e.to_string()),
+
+            interval.tick().await;
         }
     }
 }
@@ -293,7 +303,7 @@ pub struct OnlyToken {
 #[derive(Deserialize)]
 pub struct GeeTestV3Token {
     pub challenge: String,
-    pub validate: String
+    pub validate: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -304,7 +314,7 @@ pub struct GeeTestV4Token {
     pub gen_time: String,
     pub lot_number: String,
     pub pass_token: String,
-    pub risk_type: String
+    pub risk_type: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -319,12 +329,12 @@ pub struct ReCaptchaToken {
 #[serde(rename_all = "camelCase")]
 pub struct DataDomeToken {
     pub user_agent: String,
-    pub cookie: isize
+    pub cookie: isize,
 }
 
 #[derive(Deserialize)]
 pub struct AwsWafToken {
-    pub cookie: String
+    pub cookie: String,
 }
 
 #[derive(Deserialize, Serialize)]
