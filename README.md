@@ -91,7 +91,7 @@ let capsolver = Capsolver::new(config);
 
 ## Basic Usage
 Checking your Capsolver balance:
-```
+```rust
 let res = capsolver.get_balance().await?;
 
 println!("Balance: {},\nPackages: {:?}", res.balance, res.packages);
